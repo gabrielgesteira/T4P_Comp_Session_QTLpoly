@@ -24,6 +24,7 @@ phenotypes = read.table("pheno.txt", header=T, sep=" ", row.names = 1)
 ## Check individual names
 dimnames(genoprob4x[[1]]$probs)[[3]]
 rownames(phenotypes)
+all(rownames(phenotypes) %in% dimnames(genoprob4x[[1]]$probs)[[3]])
 
 ## Read data to a QTLpoly object
 dat = read_data(ploidy = 4, geno.prob = genoprob4x, pheno = phenotypes, step = 1)
@@ -32,7 +33,7 @@ print(dat, detailed = TRUE)
 ## Score-based resampling method
 data.sim = simulate_qtl(data = dat, mu = 0, h2.qtl = NULL, var.error = 1, n.sim = 10, missing = TRUE, seed = 123)
 score.null = null_model(data = data.sim$results, n.clusters = 1, plot = NULL)
-## score.null = null_model2(data = data.sim$results, n.clusters = 6, plot = NULL)
+## score.null = null_model2(data = data.sim$results, n.clusters = 12, plot = NULL)
 min.pvl = unlist(lapply(score.null$results, function(x) return(x$pval[which.max(x$stat)])))
 quantile(sort(min.pvl), c(0.2,0.05))
 ## Setting thresholds
@@ -42,27 +43,27 @@ sig.bwd = quantile(sort(min.pvl), 0.05)
 
 ## Manual QTL detection
 null.mod = null_model(data = dat, pheno.col = 1, n.clusters = 1)
-## null.mod = null_model2(data = dat, pheno.col = 1, n.clusters = 1)
+## null.mod = null_model2(data = dat, pheno.col = 1, n.clusters = 12)
 print(null.mod)
-search.mod = search_qtl(data = dat, model = null.mod, w.size = 15, sig.fwd = 0.01, n.clusters = 6)
+search.mod = search_qtl(data = dat, model = null.mod, w.size = 15, sig.fwd = 0.01, n.clusters = 12)
 print(search.mod)
-optimize.mod = optimize_qtl(data = dat, model = search.mod, sig.bwd = 1e-04, n.clusters = 6)
+optimize.mod = optimize_qtl(data = dat, model = search.mod, sig.bwd = 1e-04, n.clusters = 12)
 print(optimize.mod)
-search.mod2 = search_qtl(data = dat, model = optimize.mod, sig.fwd = 1e-04, n.clusters = 6)
+search.mod2 = search_qtl(data = dat, model = optimize.mod, sig.fwd = 1e-04, n.clusters = 12)
 print(search.mod2)
-profile.mod = profile_qtl(data = dat, model = optimize.mod, d.sint = 1.5, polygenes = FALSE, n.clusters = 6)
+profile.mod = profile_qtl(data = dat, model = optimize.mod, d.sint = 1.5, polygenes = FALSE, n.clusters = 12)
 print(profile.mod)
 print(profile.mod, sint = "lower")
 print(profile.mod, sint = "upper")
 
 ## Automatic QTL detection
 remim.mod = remim(data = dat, pheno.col = 1, w.size = 15, sig.fwd = sig.fwd, sig.bwd = sig.bwd, d.sint = 1.5, n.clusters = 1)
-## remim.mod = remim2(data = data, pheno.col = 1, w.size = 15, sig.fwd = sig.fwd, sig.bwd = sig.bwd, d.sint = 1.5, n.clusters = 1)print(remim.mod)
+remim.mod = remim2(data = dat, pheno.col = 1, w.size = 15, sig.fwd = sig.fwd, sig.bwd = sig.bwd, d.sint = 1.5, n.clusters = 12)
+print(remim.mod)
 print(remim.mod, sint = "lower")
 print(remim.mod, sint = "upper")
 plot_profile(data = dat, model = remim.mod, grid = TRUE)
 plot_sint(data = dat, model = remim.mod)
-
 
 ## Fit final QTL model
 fitted.mod = fit_model(data = dat, model = remim.mod)
@@ -76,15 +77,16 @@ plot(est.effects, p1 = "Atlantic", p2 = "B1829-5")
 ## Predict QTL-based breeding values
 y.hat = breeding_values(data = dat, fitted = fitted.mod)
 plot(y.hat)
+rownames(y.hat$results$FM07$y.hat)[which.max(y.hat$results$FM07$y.hat)] # Best individual
 
 ## Run FEIM for comparison
-perm = permutations(data = dat, n.sim = 1000, n.clusters = 1)
+perm = permutations(data = dat, n.sim = 10, n.clusters = 1)
 print(perm)
 (sig.lod = perm$sig.lod$`0.95`)
 ## sig.lod = c(5.68, 5.78, 5.6)  # 5% genome-wide significance level
-feim.mod = feim(data = data, w.size = 15, sig.lod = sig.lod)
+feim.mod = feim(data = dat, w.size = 15, sig.lod = sig.lod)
 print(feim.mod)
-plot_profile(data = data, model = feim.mod, grid = TRUE)
+plot_profile(data = dat, model = feim.mod, grid = TRUE)
 
 ## Exporting results to VIEWpoly
 save(maps4x, file = "mappoly.maps.RData")
